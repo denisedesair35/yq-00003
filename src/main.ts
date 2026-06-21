@@ -44,39 +44,33 @@ function handleRestart(): void {
 }
 
 function bindEvents(): void {
-  document.querySelectorAll<HTMLButtonElement>('.action-btn-large, .action-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const action = btn.dataset.action;
+  const app = document.getElementById('app');
+  if (!app || app.dataset.delegated === 'true') return;
+
+  app.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+
+    const actionBtn = target.closest<HTMLButtonElement>('.action-btn-large, .action-btn');
+    if (actionBtn) {
+      const action = actionBtn.dataset.action;
       if (action) {
         handleAction(action);
       }
-    });
+      return;
+    }
+
+    if (target.closest<HTMLButtonElement>('#clearLogsBtn')) {
+      handleClearLogs();
+      return;
+    }
+
+    if (target.closest<HTMLButtonElement>('#restartBtn')) {
+      handleRestart();
+      return;
+    }
   });
 
-  const app = document.getElementById('app');
-  if (app && !app.dataset.delegated) {
-    app.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      const btn = target.closest<HTMLButtonElement>('.action-btn-large, .action-btn');
-      if (btn) {
-        const action = btn.dataset.action;
-        if (action) {
-          handleAction(action);
-        }
-      }
-    });
-    app.dataset.delegated = 'true';
-  }
-
-  const clearLogsBtn = document.getElementById('clearLogsBtn');
-  if (clearLogsBtn) {
-    clearLogsBtn.addEventListener('click', handleClearLogs);
-  }
-
-  const restartBtn = document.getElementById('restartBtn');
-  if (restartBtn) {
-    restartBtn.addEventListener('click', handleRestart);
-  }
+  app.dataset.delegated = 'true';
 }
 
 function refreshUI(): void {
