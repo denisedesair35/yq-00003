@@ -1,26 +1,45 @@
 import './style.css';
-import { getState } from './state';
+import { getState, resetState, loadState } from './state';
 import { renderGame, mountGame } from './renderer';
 import { logger } from './logger';
+import { executeAction } from './actions';
+import { saveGame, loadGame, clearSave, hasSave } from './storage';
 
-function handleAction(action: string): void {
-  const actionNames: Record<string, string> = {
-    explore: '探索',
-    hunt: '狩猎',
-    gather: '采集',
-    rest: '休息',
-    train: '训练',
-    build: '建造',
-    trade: '交易',
-    recruit: '招募'
-  };
-  const name = actionNames[action] || action;
-  logger.info(`[${name}] 功能开发中，敬请期待...`);
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleSave(): void {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const state = getState();
+    saveGame(state);
+    flashSaveIndicator();
+  }, 300);
+}
+
+function flashSaveIndicator(): void {
+  const indicator = document.getElementById('saveIndicator');
+  if (!indicator) return;
+  indicator.classList.add('save-flash');
+  setTimeout(() => indicator.classList.remove('save-flash'), 1200);
+}
+
+function handleAction(actionId: string): void {
+  executeAction(actionId);
+  scheduleSave();
   refreshUI();
 }
 
 function handleClearLogs(): void {
   logger.clear();
+  scheduleSave();
+  refreshUI();
+}
+
+function handleRestart(): void {
+  if (!confirm('确定要重新开始吗？当前进度将会丢失！')) return;
+  clearSave();
+  resetState();
+  logger.info('游戏已重置。你重新站在了家族领地的大门前。');
   refreshUI();
 }
 
@@ -37,6 +56,11 @@ function bindEvents(): void {
   const clearLogsBtn = document.getElementById('clearLogsBtn');
   if (clearLogsBtn) {
     clearLogsBtn.addEventListener('click', handleClearLogs);
+  }
+
+  const restartBtn = document.getElementById('restartBtn');
+  if (restartBtn) {
+    restartBtn.addEventListener('click', handleRestart);
   }
 }
 
@@ -55,6 +79,18 @@ function initGame(): void {
     console.error('未找到 #app 根元素');
     return;
   }
+
+  if (hasSave()) {
+    const saved = loadGame();
+    if (saved) {
+      loadState(saved);
+      refreshUI();
+      logger.info('存档已加载。');
+      refreshUI();
+      return;
+    }
+  }
+
   refreshUI();
   logger.info('游戏初始化完成。');
   refreshUI();
