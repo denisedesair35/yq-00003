@@ -70,6 +70,25 @@ export interface PhaseInfo {
   description: string;
 }
 
+export type GoalType = 'resource' | 'location' | 'action_count' | 'level' | 'morale' | 'defense';
+
+export interface PhaseGoal {
+  id: string;
+  name: string;
+  description: string;
+  type: GoalType;
+  targetKey?: string;
+  targetValue: number;
+  currentValue: number;
+  completed: boolean;
+}
+
+export interface PhaseGoals {
+  phaseId: PhaseId;
+  goals: PhaseGoal[];
+  allCompleted: boolean;
+}
+
 export type ActionArea = 'travel' | 'management' | 'military' | 'diplomacy';
 
 export interface ActionDef {
@@ -96,6 +115,7 @@ export interface GameState {
   inventory: InventoryItem[];
   location: LocationInfo;
   phase: PhaseInfo;
+  phaseGoals: PhaseGoals;
   availableActions: ActionDef[];
   logs: LogEntry[];
   turnCount: number;

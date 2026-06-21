@@ -1,6 +1,8 @@
 import type { LocationInfo, PhaseInfo, ActionDef } from './types';
 import { getState, setState } from './state';
 import { logger } from './logger';
+import { locationFamilyEstate, locationOnTheRoad, locationHowlingFortress, phaseDeparture, phaseJourney, phaseArrival, phaseFoundation } from './constants';
+import { recordAction, buildPhaseGoals, getGoalTitleForPhase } from './goals';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -8,10 +10,16 @@ function clamp(value: number, min: number, max: number): number {
 
 function advancePhase(newPhase: PhaseInfo): void {
   const state = getState();
-  setState({
+  if (state.phase.id === newPhase.id) return;
+  const oldPhaseName = state.phase.name;
+  const newState = {
     ...state,
     phase: newPhase
-  });
+  };
+  newState.phaseGoals = buildPhaseGoals(newPhase.id, newState);
+  setState(newState);
+  logger.success(`阶段更迭：${oldPhaseName} → ${newPhase.name}`);
+  logger.info(`新目标：${newPhase.objective}`);
 }
 
 function advanceLocation(newLocation: LocationInfo): void {
@@ -58,51 +66,21 @@ function updateResources(
   return true;
 }
 
-const locationFamilyEstate: LocationInfo = {
-  id: 'family_estate',
-  name: '家族领地',
-  description: '繁华的家族核心领地，你在这里不受欢迎。'
-};
+function refreshPhaseGoals(): void {
+  const state = getState();
+  const phaseGoals = buildPhaseGoals(state.phase.id, state);
+  const wasCompleted = state.phaseGoals?.allCompleted;
+  
+  setState({
+    ...state,
+    phaseGoals
+  });
 
-const locationOnTheRoad: LocationInfo = {
-  id: 'on_the_road',
-  name: '赴任途中',
-  description: '前往边境的漫长旅途，荒野与危险并存。'
-};
-
-const locationHowlingFortress: LocationInfo = {
-  id: 'howling_fortress',
-  name: '呼啸要塞',
-  description: '残破的边境要塞，你的新领地。百废待兴。'
-};
-
-const phaseDeparture: PhaseInfo = {
-  id: 'departure',
-  name: '离乡',
-  objective: '整理行装，离开家族领地，踏上赴任之路',
-  description: '你被家族排挤，被迫前往边境。在离开之前，你需要做好充分准备。'
-};
-
-const phaseJourney: PhaseInfo = {
-  id: 'journey',
-  name: '旅途',
-  objective: '安全抵达边境要塞',
-  description: '前往边境的路途遥远而危险，小心行事。'
-};
-
-const phaseArrival: PhaseInfo = {
-  id: 'arrival',
-  name: '初临',
-  objective: '安定人心，建立基本秩序',
-  description: '你抵达了破败的呼啸要塞，这里急需一位合格的领主。'
-};
-
-const phaseFoundation: PhaseInfo = {
-  id: 'foundation',
-  name: '立基',
-  objective: '稳固领地，发展资源，抵御腐化蔓延',
-  description: '边境之地危机四伏，唯有夯实根基方能立足。'
-};
+  if (phaseGoals.allCompleted && !wasCompleted) {
+    const goalTitle = getGoalTitleForPhase(state.phase.id);
+    logger.success(`阶段目标达成：${goalTitle}！`);
+  }
+}
 
 export function getActionsForState(): ActionDef[] {
   const { location: { id: locationId } } = getState();
@@ -159,7 +137,10 @@ export function executeAction(actionId: string): void {
       break;
     default:
       logger.warning(`未知行动: ${actionId}`);
+      return;
   }
+  recordAction(actionId);
+  refreshPhaseGoals();
 }
 
 function increaseBond(amount: number = 1): void {

@@ -1,5 +1,6 @@
-import type { CharacterStats, ChosenOne, TerritoryStats, InventoryItem, LogEntry, GameState, LocationInfo, PhaseInfo, ActionDef } from './types';
-import { locationFamilyEstate, phaseDeparture } from './actions';
+import type { CharacterStats, ChosenOne, TerritoryStats, InventoryItem, LogEntry, GameState, LocationInfo, PhaseInfo, ActionDef, PhaseGoals } from './types';
+import { locationFamilyEstate, phaseDeparture } from './constants';
+import { buildPhaseGoals, resetActionCounters } from './goals';
 
 const initialCharacter: CharacterStats = {
   name: '艾德里安·冯·灰烬',
@@ -86,17 +87,30 @@ const initialLogs: LogEntry[] = [
   }
 ];
 
-export const initialGameState: GameState = {
-  character: initialCharacter,
-  chosenOnes: [initialChosenOne],
-  territory: initialTerritory,
-  inventory: initialInventory,
-  location: initialLocation,
-  phase: initialPhase,
-  availableActions: initialActions,
-  logs: initialLogs,
-  turnCount: 0
+const initialPhaseGoals: PhaseGoals = {
+  phaseId: 'departure',
+  goals: [],
+  allCompleted: false
 };
+
+function createInitialState(): GameState {
+  const baseState: GameState = {
+    character: initialCharacter,
+    chosenOnes: [initialChosenOne],
+    territory: initialTerritory,
+    inventory: initialInventory,
+    location: initialLocation,
+    phase: initialPhase,
+    phaseGoals: initialPhaseGoals,
+    availableActions: initialActions,
+    logs: initialLogs,
+    turnCount: 0
+  };
+  baseState.phaseGoals = buildPhaseGoals(baseState.phase.id, baseState);
+  return baseState;
+}
+
+export const initialGameState: GameState = createInitialState();
 
 let currentState: GameState = JSON.parse(JSON.stringify(initialGameState));
 
@@ -109,9 +123,14 @@ export function setState(newState: GameState): void {
 }
 
 export function resetState(): void {
-  currentState = JSON.parse(JSON.stringify(initialGameState));
+  resetActionCounters();
+  currentState = createInitialState();
+  currentState.phaseGoals = buildPhaseGoals(currentState.phase.id, currentState);
 }
 
 export function loadState(saved: GameState): void {
   currentState = saved;
+  if (!currentState.phaseGoals) {
+    currentState.phaseGoals = buildPhaseGoals(currentState.phase.id, currentState);
+  }
 }

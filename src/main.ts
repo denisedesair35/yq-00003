@@ -5,16 +5,7 @@ import { logger } from './logger';
 import { executeAction } from './actions';
 import { saveGame, loadGame, clearSave, hasSave } from './storage';
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
-
-function scheduleSave(): void {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    const state = getState();
-    saveGame(state);
-    flashSaveIndicator();
-  }, 300);
-}
+let actionLock = false;
 
 function flashSaveIndicator(): void {
   const indicator = document.getElementById('saveIndicator');
@@ -23,23 +14,31 @@ function flashSaveIndicator(): void {
   setTimeout(() => indicator.classList.remove('save-flash'), 1200);
 }
 
+function persistState(): void {
+  saveGame(getState());
+  flashSaveIndicator();
+}
+
 function handleAction(actionId: string): void {
+  if (actionLock) return;
+  actionLock = true;
   executeAction(actionId);
-  scheduleSave();
+  persistState();
   refreshUI();
+  setTimeout(() => { actionLock = false; }, 400);
 }
 
 function handleClearLogs(): void {
   logger.clear();
-  scheduleSave();
+  persistState();
   refreshUI();
 }
 
 function handleRestart(): void {
-  if (!confirm('确定要重新开始吗？当前进度将会丢失！')) return;
+  if (!confirm('确定要重新开始吗？当前所有进度将会丢失！')) return;
   clearSave();
   resetState();
-  logger.info('游戏已重置。你重新站在了家族领地的大门前。');
+  persistState();
   refreshUI();
 }
 
@@ -48,6 +47,8 @@ function bindEvents(): void {
   if (!app || app.dataset.delegated === 'true') return;
 
   app.addEventListener('click', (e) => {
+    if (actionLock) return;
+
     const target = e.target as HTMLElement;
 
     const actionBtn = target.closest<HTMLButtonElement>('.action-btn-large, .action-btn');
@@ -94,15 +95,16 @@ function initGame(): void {
     if (saved) {
       loadState(saved);
       refreshUI();
-      logger.info('存档已加载。');
-      refreshUI();
       return;
     }
   }
 
   refreshUI();
-  logger.info('游戏初始化完成。');
-  refreshUI();
+  persistState();
 }
+
+window.addEventListener('beforeunload', () => {
+  saveGame(getState());
+});
 
 document.addEventListener('DOMContentLoaded', initGame);

@@ -1,6 +1,7 @@
-import type { GameState, CharacterStats, ChosenOne, TerritoryStats, InventoryItem, LogEntry, ActionDef } from './types';
+import type { GameState, CharacterStats, ChosenOne, TerritoryStats, InventoryItem, LogEntry, ActionDef, PhaseGoal } from './types';
 import { formatTimestamp } from './logger';
 import { getActionsForState } from './actions';
+import { getGoalTitleForPhase } from './goals';
 
 function createProgressBar(current: number, max: number, barClass: string): string {
   const percentage = Math.min(100, Math.max(0, (current / max) * 100));
@@ -177,6 +178,82 @@ function renderTerritory(territory: TerritoryStats): string {
   `;
 }
 
+function renderObjectiveBanner(state: GameState): string {
+  const phaseIcons: Record<string, string> = {
+    departure: '🏚',
+    journey: '🛤',
+    arrival: '🏰',
+    foundation: '⚔'
+  };
+  const icon = phaseIcons[state.phase.id] || '🎯';
+  return `
+    <div class="objective-banner phase-${state.phase.id}">
+      <div class="objective-phase">
+        <span class="objective-phase-icon">${icon}</span>
+        <span class="objective-phase-name">阶段：${state.phase.name}</span>
+      </div>
+      <div class="objective-divider"></div>
+      <div class="objective-text">
+        <span class="objective-label">当前目标</span>
+        <span class="objective-value">${state.phase.objective}</span>
+      </div>
+    </div>
+  `;
+}
+
+function getGoalProgressPercentage(goal: PhaseGoal): number {
+  if (goal.targetValue === 0) return 0;
+  const percentage = (goal.currentValue / goal.targetValue) * 100;
+  return Math.min(100, Math.max(0, percentage));
+}
+
+function renderPhaseGoalItem(goal: PhaseGoal): string {
+  const percentage = getGoalProgressPercentage(goal);
+  const statusIcon = goal.completed ? '✓' : '○';
+  const statusClass = goal.completed ? 'goal-completed' : 'goal-pending';
+  
+  return `
+    <div class="goal-item ${statusClass}" title="${goal.description}">
+      <div class="goal-item-header">
+        <span class="goal-status-icon">${statusIcon}</span>
+        <span class="goal-name">${goal.name}</span>
+        <span class="goal-progress-text">${goal.currentValue}/${goal.targetValue}</span>
+      </div>
+      <div class="goal-progress-bar">
+        <div class="goal-progress-fill ${goal.completed ? 'goal-fill-complete' : 'goal-fill-pending'}" 
+             style="width: ${percentage}%"></div>
+      </div>
+      <div class="goal-description">${goal.description}</div>
+    </div>
+  `;
+}
+
+function renderPhaseGoals(state: GameState): string {
+  const { phaseGoals } = state;
+  if (!phaseGoals || !phaseGoals.goals || phaseGoals.goals.length === 0) {
+    return '<div class="empty-goals">暂无阶段目标</div>';
+  }
+
+  const goalTitle = getGoalTitleForPhase(state.phase.id);
+  const completedCount = phaseGoals.goals.filter(g => g.completed).length;
+  const totalCount = phaseGoals.goals.length;
+
+  const goalsHtml = phaseGoals.goals.map(renderPhaseGoalItem).join('');
+
+  return `
+    <div class="phase-goals-section">
+      <div class="goals-header">
+        <h3 class="info-title info-title-goals">🏆 阶段目标：${goalTitle}</h3>
+        <span class="goals-count">${completedCount}/${totalCount}</span>
+      </div>
+      <div class="goals-list">
+        ${goalsHtml}
+      </div>
+      ${phaseGoals.allCompleted ? '<div class="goals-all-complete">✨ 阶段目标已全部达成！</div>' : ''}
+    </div>
+  `;
+}
+
 function renderLocationAndPhase(state: GameState): string {
   const locationIcons: Record<string, string> = {
     family_estate: '🏛',
@@ -202,6 +279,8 @@ function renderLocationAndPhase(state: GameState): string {
         <div class="phase-objective-large">目标：${state.phase.objective}</div>
         <div class="phase-desc">${state.phase.description}</div>
       </div>
+      <div class="info-divider"></div>
+      ${renderPhaseGoals(state)}
       <div class="info-divider"></div>
       <div class="info-section info-turn-row">
         <div class="turn-counter-large">⏱ 回合：${state.turnCount}</div>
@@ -298,6 +377,7 @@ export function renderGame(state: GameState): string {
           <span class="save-indicator" id="saveIndicator">💾 已保存</span>
         </div>
       </header>
+      ${renderObjectiveBanner(state)}
       <div class="game-layout">
         <div class="left-column">
           ${renderLocationAndPhase(state)}
