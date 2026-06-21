@@ -44,7 +44,7 @@ function handleRestart(): void {
 }
 
 function bindEvents(): void {
-  document.querySelectorAll<HTMLButtonElement>('.action-btn').forEach(btn => {
+  document.querySelectorAll<HTMLButtonElement>('.action-btn-large, .action-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action;
       if (action) {
@@ -52,6 +52,21 @@ function bindEvents(): void {
       }
     });
   });
+
+  const app = document.getElementById('app');
+  if (app && !app.dataset.delegated) {
+    app.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const btn = target.closest<HTMLButtonElement>('.action-btn-large, .action-btn');
+      if (btn) {
+        const action = btn.dataset.action;
+        if (action) {
+          handleAction(action);
+        }
+      }
+    });
+    app.dataset.delegated = 'true';
+  }
 
   const clearLogsBtn = document.getElementById('clearLogsBtn');
   if (clearLogsBtn) {
